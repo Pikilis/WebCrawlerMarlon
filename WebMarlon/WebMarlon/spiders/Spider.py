@@ -5,29 +5,25 @@ class NestleBolosSpider(scrapy.Spider):
     start_urls = ["https://www.receitasnestle.com.br/nossas-receitas/receitas-bolos?p=1"]
 
     def parse(self, response):
-        # Seleciona todas as receitas da página
+        # Seleciona todas as receitas na página
         receitas = response.css('a.recipes__card')
 
-        # Extrai os títulos e links das receitas
+        # Extrai o título e o link de cada receita
         for receita in receitas:
-            titulo = receita.css('h3.name::text').get().strip()
-            link = response.urljoin(receita.css('::attr(href)').get())
+            titulo = receita.css('h3.name::text').get()
+            link = receita.css('::attr(href)').get()
 
-            # Salva cada receita
-            yield {
-                'titulo': titulo,
-                'link': link
-            }
+            # Verifica se o título e o link foram extraídos corretamente
+            if titulo and link:
+                yield {
+                    'titulo': titulo.strip(),
+                    'link': response.urljoin(link)
+                }
 
-        # Verifica se há mais páginas
-        current_page_number = int(response.url.split("p=")[-1])
-        next_page_number = current_page_number + 1
-        next_page_url = f"https://www.receitasnestle.com.br/nossas-receitas/receitas-bolos?p={next_page_number}"
-
-        # Condição de parada: verifica o número de receitas e a existência de um elemento específico
-        # (ajuste o seletor 'div.no-results' conforme necessário)
-        num_receitas = len(receitas)
-        if num_receitas >= 5 and not response.css('div.no-results'):
-            yield scrapy.Request(url=next_page_url, callback=self.parse)
+        # Verifica se há um botão "Mostrar mais" e obtém o link da próxima página
+        next_page = response.css('a#load_more::attr(href)').get()
+        if next_page:
+            # Segue para a próxima página usando o link do botão "Mostrar mais"
+            yield response.follow(next_page, callback=self.parse)
         else:
-            self.logger.info(f"Fim da paginação na página {current_page_number}")
+            self.logger.info("Fim da paginação.")
